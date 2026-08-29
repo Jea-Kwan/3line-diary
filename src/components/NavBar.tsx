@@ -2,8 +2,10 @@ import { NavLink } from 'react-router-dom';
 
 const TABS = [
   { to: '/', label: '오늘', icon: '✏️', end: true },
+  { to: '/calendar', label: '달력', icon: '📅', end: false },
   { to: '/list', label: '목록', icon: '📖', end: false },
   { to: '/book', label: '책만들기', icon: '📕', end: false },
+  { to: '/backup', label: '백업', icon: '💾', end: false },
 ];
 
 export function NavBar() {

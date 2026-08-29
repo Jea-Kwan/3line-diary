@@ -63,3 +63,38 @@ export async function deleteEntry(date: string): Promise<void> {
   const db = await getDB();
   await db.delete(STORE_NAME, date);
 }
+
+export interface ImportItem {
+  date: string;
+  lines: [string, string, string];
+  photo: Blob | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** 백업에서 복원한다. 같은 날짜가 이미 있으면 덮어쓰되 id와 최초 작성 시각은 유지한다. */
+export async function importEntries(
+  items: ImportItem[]
+): Promise<{ added: number; updated: number }> {
+  const db = await getDB();
+  const tx = db.transaction(STORE_NAME, 'readwrite');
+  let added = 0;
+  let updated = 0;
+
+  for (const item of items) {
+    const existing = await tx.store.get(item.date);
+    if (existing) updated++;
+    else added++;
+    await tx.store.put({
+      id: existing?.id ?? uuidv4(),
+      date: item.date,
+      photo: item.photo,
+      lines: item.lines,
+      createdAt: Math.min(existing?.createdAt ?? item.createdAt, item.createdAt),
+      updatedAt: item.updatedAt,
+    });
+  }
+
+  await tx.done;
+  return { added, updated };
+}
