@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { importEntries, listEntries } from '../db/db';
 import { DiaryEntry } from '../types';
 import {
+  BackupFile,
   backupFileName,
   buildBackup,
   dataURLToBlob,
@@ -9,12 +10,14 @@ import {
 } from '../utils/backup';
 
 type Status = { kind: 'ok' | 'error'; message: string } | null;
+type PendingImport = { backup: BackupFile; overwrites: number };
 
 export function BackupPage() {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status>(null);
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function reload() {
@@ -57,22 +60,22 @@ export function BackupPage() {
     e.target.value = '';
     if (!file) return;
 
-    setBusy(true);
     setStatus(null);
     try {
       const backup = parseBackup(await file.text());
       const existing = new Set(entries.map((entry) => entry.date));
       const overwrites = backup.entries.filter((entry) => existing.has(entry.date)).length;
+      setPendingImport({ backup, overwrites });
+    } catch (err) {
+      setStatus({ kind: 'error', message: (err as Error).message });
+    }
+  }
 
-      const question =
-        overwrites > 0
-          ? `일기 ${backup.entries.length}개를 가져옵니다. 그중 ${overwrites}개는 이미 있는 날짜라 덮어써집니다. 계속할까요?`
-          : `일기 ${backup.entries.length}개를 가져올까요?`;
-      if (!confirm(question)) {
-        setBusy(false);
-        return;
-      }
-
+  async function confirmImport() {
+    if (!pendingImport) return;
+    const { backup } = pendingImport;
+    setBusy(true);
+    try {
       const result = await importEntries(
         backup.entries.map((entry) => ({
           date: entry.date,
@@ -91,6 +94,7 @@ export function BackupPage() {
       setStatus({ kind: 'error', message: (err as Error).message });
     } finally {
       setBusy(false);
+      setPendingImport(null);
     }
   }
 
@@ -133,6 +137,28 @@ export function BackupPage() {
         <button className="delete-button" onClick={() => fileRef.current?.click()} disabled={busy}>
           백업 파일 불러오기
         </button>
+
+        {pendingImport && (
+          <div className="delete-confirm">
+            <p>
+              {pendingImport.overwrites > 0
+                ? `일기 ${pendingImport.backup.entries.length}개를 가져옵니다. 그중 ${pendingImport.overwrites}개는 이미 있는 날짜라 덮어써집니다. 계속할까요?`
+                : `일기 ${pendingImport.backup.entries.length}개를 가져올까요?`}
+            </p>
+            <div className="delete-confirm-actions">
+              <button
+                className="delete-confirm-cancel"
+                onClick={() => setPendingImport(null)}
+                disabled={busy}
+              >
+                취소
+              </button>
+              <button className="delete-confirm-ok" onClick={confirmImport} disabled={busy}>
+                가져오기
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       {status && (

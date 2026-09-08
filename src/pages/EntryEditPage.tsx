@@ -12,6 +12,7 @@ export function EntryEditPage() {
   const [photo, setPhoto] = useState<Blob | null>(null);
   const [loading, setLoading] = useState(true);
   const [isNew, setIsNew] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
     if (!date) return;
@@ -34,7 +35,6 @@ export function EntryEditPage() {
 
   async function handleDelete() {
     if (!date) return;
-    if (!confirm('이 일기를 삭제할까요?')) return;
     await deleteEntry(date);
     navigate('/list');
   }
@@ -60,9 +60,23 @@ export function EntryEditPage() {
         저장하기
       </button>
       {!isNew && (
-        <button className="delete-button" onClick={handleDelete}>
-          삭제하기
-        </button>
+        confirmingDelete ? (
+          <div className="delete-confirm">
+            <p>이 일기를 삭제할까요? 되돌릴 수 없어요.</p>
+            <div className="delete-confirm-actions">
+              <button className="delete-confirm-cancel" onClick={() => setConfirmingDelete(false)}>
+                취소
+              </button>
+              <button className="delete-confirm-ok" onClick={handleDelete}>
+                삭제
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button className="delete-button" onClick={() => setConfirmingDelete(true)}>
+            삭제하기
+          </button>
+        )
       )}
     </div>
   );
