@@ -28,30 +28,38 @@ function getDB(): Promise<IDBPDatabase<DiaryDB>> {
   return dbPromise;
 }
 
+/** 세 칸 입력 시절(`lines: [string,string,string]`)에 저장된 레코드를 `text`로 변환한다. */
+function normalize(raw: unknown): DiaryEntry | undefined {
+  if (!raw) return undefined;
+  const record = raw as DiaryEntry & { lines?: [string, string, string] };
+  if (typeof record.text === 'string') return record;
+  return { ...record, text: (record.lines ?? []).join('\n') };
+}
+
 export async function getEntryByDate(date: string): Promise<DiaryEntry | undefined> {
   const db = await getDB();
-  return db.get(STORE_NAME, date);
+  return normalize(await db.get(STORE_NAME, date));
 }
 
 export async function listEntries(): Promise<DiaryEntry[]> {
   const db = await getDB();
   const all = await db.getAllFromIndex(STORE_NAME, 'by-date');
-  return all.sort((a, b) => b.date.localeCompare(a.date));
+  return all.map((entry) => normalize(entry)!).sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export async function saveEntry(
   date: string,
-  lines: [string, string, string],
+  text: string,
   photo: Blob | null
 ): Promise<DiaryEntry> {
   const db = await getDB();
-  const existing = await db.get(STORE_NAME, date);
+  const existing = normalize(await db.get(STORE_NAME, date));
   const now = Date.now();
   const entry: DiaryEntry = {
     id: existing?.id ?? uuidv4(),
     date,
     photo: photo ?? existing?.photo ?? null,
-    lines,
+    text,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
@@ -66,7 +74,7 @@ export async function deleteEntry(date: string): Promise<void> {
 
 export interface ImportItem {
   date: string;
-  lines: [string, string, string];
+  text: string;
   photo: Blob | null;
   createdAt: number;
   updatedAt: number;
@@ -82,14 +90,14 @@ export async function importEntries(
   let updated = 0;
 
   for (const item of items) {
-    const existing = await tx.store.get(item.date);
+    const existing = normalize(await tx.store.get(item.date));
     if (existing) updated++;
     else added++;
     await tx.store.put({
       id: existing?.id ?? uuidv4(),
       date: item.date,
       photo: item.photo,
-      lines: item.lines,
+      text: item.text,
       createdAt: Math.min(existing?.createdAt ?? item.createdAt, item.createdAt),
       updatedAt: item.updatedAt,
     });

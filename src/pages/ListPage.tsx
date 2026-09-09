@@ -4,6 +4,7 @@ import { listEntries } from '../db/db';
 import { DiaryEntry } from '../types';
 import { formatKorean } from '../utils/date';
 import { blobToObjectURL } from '../utils/image';
+import { firstLine } from '../utils/text';
 
 export function ListPage() {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
@@ -57,7 +58,7 @@ export function ListPage() {
               </div>
               <div className="entry-summary">
                 <div className="entry-date">{formatKorean(entry.date)}</div>
-                <div className="entry-first-line">{entry.lines[0] || '(내용 없음)'}</div>
+                <div className="entry-first-line">{firstLine(entry.text) || '(내용 없음)'}</div>
               </div>
             </li>
           ))}

@@ -79,7 +79,7 @@ export function BackupPage() {
       const result = await importEntries(
         backup.entries.map((entry) => ({
           date: entry.date,
-          lines: entry.lines,
+          text: entry.text,
           photo: entry.photo ? dataURLToBlob(entry.photo) : null,
           createdAt: entry.createdAt,
           updatedAt: entry.updatedAt,

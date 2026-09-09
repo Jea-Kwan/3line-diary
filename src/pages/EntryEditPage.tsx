@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { PhotoPicker } from '../components/PhotoPicker';
-import { LineInputs } from '../components/LineInputs';
+import { DiaryTextArea } from '../components/DiaryTextArea';
 import { deleteEntry, getEntryByDate, saveEntry } from '../db/db';
 import { formatKorean } from '../utils/date';
 
 export function EntryEditPage() {
   const { date } = useParams<{ date: string }>();
   const navigate = useNavigate();
-  const [lines, setLines] = useState<[string, string, string]>(['', '', '']);
+  const [text, setText] = useState('');
   const [photo, setPhoto] = useState<Blob | null>(null);
   const [loading, setLoading] = useState(true);
   const [isNew, setIsNew] = useState(false);
@@ -18,7 +18,7 @@ export function EntryEditPage() {
     if (!date) return;
     getEntryByDate(date).then((entry) => {
       if (entry) {
-        setLines(entry.lines);
+        setText(entry.text);
         setPhoto(entry.photo);
       } else {
         setIsNew(true);
@@ -29,7 +29,7 @@ export function EntryEditPage() {
 
   async function handleSave() {
     if (!date) return;
-    await saveEntry(date, lines, photo);
+    await saveEntry(date, text, photo);
     navigate(-1);
   }
 
@@ -39,7 +39,7 @@ export function EntryEditPage() {
     navigate('/list');
   }
 
-  const hasContent = lines.some((l) => l.trim() !== '') || photo;
+  const hasContent = text.trim() !== '' || !!photo;
 
   if (loading) return null;
 
@@ -54,7 +54,7 @@ export function EntryEditPage() {
       </header>
 
       <PhotoPicker photo={photo} onChange={setPhoto} />
-      <LineInputs lines={lines} onChange={setLines} />
+      <DiaryTextArea text={text} onChange={setText} />
 
       <button className="save-button" onClick={handleSave} disabled={!hasContent}>
         저장하기

@@ -115,44 +115,26 @@ body {
   line-height: 1;
 }
 
-/* Line inputs */
-.line-inputs {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+/* Diary text area */
+.diary-textarea {
+  width: 100%;
+  min-height: 120px;
   margin-bottom: 24px;
-}
-
-.line-input-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--card);
+  padding: 14px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 10px 14px;
-}
-
-.line-number {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.line-input-row input {
-  border: none;
-  outline: none;
-  font-size: 16px;
-  flex: 1;
-  background: transparent;
+  background: var(--card);
   color: var(--ink);
+  font-size: 16px;
+  font-family: inherit;
+  line-height: 1.6;
+  resize: none;
+  overflow: hidden;
+}
+
+.diary-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 /* Buttons */

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CalendarPage } from './CalendarPage';
 import { deleteEntry, listEntries, saveEntry } from '../db/db';
 
-const LINES: [string, string, string] = ['아침', '점심', '저녁'];
+const TEXT = '아침\n점심\n저녁';
 
 beforeEach(async () => {
   for (const entry of await listEntries()) await deleteEntry(entry.date);
@@ -27,9 +27,9 @@ function renderPage() {
 
 describe('CalendarPage', () => {
   it('이번 달을 열고 기록 개수를 알려준다', async () => {
-    await saveEntry('2026-08-03', LINES, null);
-    await saveEntry('2026-08-11', LINES, null);
-    await saveEntry('2026-07-30', LINES, null); // 지난달은 세지 않는다
+    await saveEntry('2026-08-03', TEXT, null);
+    await saveEntry('2026-08-11', TEXT, null);
+    await saveEntry('2026-07-30', TEXT, null); // 지난달은 세지 않는다
     renderPage();
 
     expect(await screen.findByText('2026년 8월')).toBeDefined();
@@ -37,7 +37,7 @@ describe('CalendarPage', () => {
   });
 
   it('일기가 있는 날에 표시를 남긴다', async () => {
-    await saveEntry('2026-08-03', LINES, null);
+    await saveEntry('2026-08-03', TEXT, null);
     renderPage();
 
     const marked = await screen.findByLabelText('2026-08-03 일기 있음');

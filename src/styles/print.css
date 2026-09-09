@@ -59,11 +59,10 @@
     margin-bottom: 12px;
   }
 
-  .book-page-lines {
-    list-style: none;
-    padding: 0;
+  .book-page-text {
     margin: 0;
     font-size: 18px;
     line-height: 1.8;
+    white-space: pre-line;
   }
 }

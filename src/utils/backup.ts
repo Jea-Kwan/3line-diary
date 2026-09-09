@@ -1,11 +1,11 @@
 import { DiaryEntry } from '../types';
 
 export const BACKUP_APP_ID = 'three-line-diary';
-export const BACKUP_VERSION = 1;
+export const BACKUP_VERSION = 2;
 
 export interface BackupEntry {
   date: string;
-  lines: [string, string, string];
+  text: string;
   photo: string | null; // data URL
   createdAt: number;
   updatedAt: number;
@@ -45,7 +45,7 @@ export async function buildBackup(entries: DiaryEntry[], now = new Date()): Prom
   for (const entry of entries) {
     backupEntries.push({
       date: entry.date,
-      lines: entry.lines,
+      text: entry.text,
       photo: entry.photo ? await blobToDataURL(entry.photo) : null,
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
@@ -85,19 +85,29 @@ export function parseBackup(text: string): BackupFile {
   }
 
   const entries: BackupEntry[] = file.entries.map((item, index) => {
-    const e = item as Partial<BackupEntry>;
+    // 예전 백업 파일(버전 1)은 세 줄이 lines 배열로 나뉘어 있었다. 하나로 합쳐서 받아들인다.
+    const e = item as Partial<BackupEntry> & { lines?: unknown };
     if (typeof e.date !== 'string' || !DATE_RE.test(e.date)) {
       throw new Error(`${index + 1}번째 일기의 날짜가 올바르지 않습니다.`);
     }
-    if (!Array.isArray(e.lines) || e.lines.length !== 3 || e.lines.some((l) => typeof l !== 'string')) {
-      throw new Error(`${e.date} 일기의 세 줄 내용이 올바르지 않습니다.`);
+    let text: string;
+    if (typeof e.text === 'string') {
+      text = e.text;
+    } else if (
+      Array.isArray(e.lines) &&
+      e.lines.length === 3 &&
+      e.lines.every((l) => typeof l === 'string')
+    ) {
+      text = (e.lines as string[]).join('\n');
+    } else {
+      throw new Error(`${e.date} 일기의 내용이 올바르지 않습니다.`);
     }
     if (e.photo != null && typeof e.photo !== 'string') {
       throw new Error(`${e.date} 일기의 사진 데이터가 올바르지 않습니다.`);
     }
     return {
       date: e.date,
-      lines: [e.lines[0], e.lines[1], e.lines[2]] as [string, string, string],
+      text,
       photo: e.photo ?? null,
       createdAt: typeof e.createdAt === 'number' ? e.createdAt : Date.now(),
       updatedAt: typeof e.updatedAt === 'number' ? e.updatedAt : Date.now(),

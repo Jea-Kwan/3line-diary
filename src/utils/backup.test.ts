@@ -15,7 +15,7 @@ function entry(overrides: Partial<DiaryEntry> = {}): DiaryEntry {
     id: 'id-1',
     date: '2026-08-29',
     photo: null,
-    lines: ['첫 줄', '둘째 줄', '셋째 줄'],
+    text: '첫 줄\n둘째 줄\n셋째 줄',
     createdAt: 1000,
     updatedAt: 2000,
     ...overrides,
@@ -68,7 +68,7 @@ describe('내보내기 → 가져오기 왕복', () => {
   it('사진을 포함해 내용이 그대로 보존된다', async () => {
     const original = entry({
       photo: new Blob([PHOTO_BYTES], { type: 'image/jpeg' }),
-      lines: ['비 오는 날', '우산을 잃어버렸다', '내일은 챙기자'],
+      text: '비 오는 날\n우산을 잃어버렸다\n내일은 챙기자',
     });
 
     const parsed = parseBackup(JSON.stringify(await buildBackup([original])));
@@ -76,7 +76,7 @@ describe('내보내기 → 가져오기 왕복', () => {
 
     const restored = parsed.entries[0];
     expect(restored.date).toBe(original.date);
-    expect(restored.lines).toEqual(original.lines);
+    expect(restored.text).toBe(original.text);
     expect(restored.createdAt).toBe(original.createdAt);
     expect(restored.updatedAt).toBe(original.updatedAt);
 
@@ -91,7 +91,7 @@ describe('parseBackup 검증', () => {
       app: BACKUP_APP_ID,
       version: BACKUP_VERSION,
       exportedAt: '2026-08-29T00:00:00.000Z',
-      entries: [{ date: '2026-08-29', lines: ['a', 'b', 'c'], photo: null }],
+      entries: [{ date: '2026-08-29', text: '자유롭게 적은 하루', photo: null }],
       ...overrides,
     });
   }
@@ -113,18 +113,18 @@ describe('parseBackup 검증', () => {
   });
 
   it('날짜 형식이 틀리면 몇 번째인지 알려준다', () => {
-    expect(() => parseBackup(file({ entries: [{ date: '2026/08/29', lines: ['a', 'b', 'c'] }] })))
+    expect(() => parseBackup(file({ entries: [{ date: '2026/08/29', text: '내용' }] })))
       .toThrow('1번째 일기의 날짜가 올바르지 않습니다.');
   });
 
-  it('세 줄이 아니면 거부한다', () => {
-    expect(() => parseBackup(file({ entries: [{ date: '2026-08-29', lines: ['a', 'b'] }] })))
-      .toThrow('세 줄 내용이 올바르지 않습니다.');
+  it('내용이 없으면 거부한다', () => {
+    expect(() => parseBackup(file({ entries: [{ date: '2026-08-29' }] })))
+      .toThrow('일기의 내용이 올바르지 않습니다.');
   });
 
   it('사진이 문자열이 아니면 거부한다', () => {
     expect(() =>
-      parseBackup(file({ entries: [{ date: '2026-08-29', lines: ['a', 'b', 'c'], photo: 42 }] }))
+      parseBackup(file({ entries: [{ date: '2026-08-29', text: '내용', photo: 42 }] }))
     ).toThrow('사진 데이터가 올바르지 않습니다.');
   });
 
@@ -134,8 +134,12 @@ describe('parseBackup 검증', () => {
     expect(typeof parsed.entries[0].updatedAt).toBe('number');
   });
 
-  it('예전 버전(1)은 그대로 받아들인다', () => {
-    expect(parseBackup(file({ version: 1 })).entries).toHaveLength(1);
+  it('예전 버전(1, 세 줄 배열)도 하나의 텍스트로 합쳐서 받아들인다', () => {
+    const parsed = parseBackup(
+      file({ version: 1, entries: [{ date: '2026-08-29', lines: ['하나', '둘', '셋'] }] })
+    );
+    expect(parsed.entries).toHaveLength(1);
+    expect(parsed.entries[0].text).toBe('하나\n둘\n셋');
   });
 });
 

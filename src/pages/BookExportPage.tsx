@@ -3,6 +3,7 @@ import { listEntries } from '../db/db';
 import { DiaryEntry } from '../types';
 import { formatKorean } from '../utils/date';
 import { blobToObjectURL } from '../utils/image';
+import { firstLine } from '../utils/text';
 
 export function BookExportPage() {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
@@ -52,7 +53,7 @@ export function BookExportPage() {
                     onChange={() => toggle(entry.date)}
                   />
                   <span>{formatKorean(entry.date)}</span>
-                  <span className="book-select-preview">{entry.lines[0]}</span>
+                  <span className="book-select-preview">{firstLine(entry.text)}</span>
                 </label>
               </li>
             ))}
@@ -77,11 +78,7 @@ export function BookExportPage() {
                   )}
                 </div>
                 <div className="book-page-date">{formatKorean(entry.date)}</div>
-                <ol className="book-page-lines">
-                  {entry.lines.map((line, i) => (
-                    <li key={i}>{line || ' '}</li>
-                  ))}
-                </ol>
+                <p className="book-page-text">{entry.text}</p>
               </section>
             ))}
           </div>
