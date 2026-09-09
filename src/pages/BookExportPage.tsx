@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { jsPDF as JsPDF } from 'jspdf';
 import { listEntries } from '../db/db';
+import { downloadBlob } from '../utils/download';
 import { DiaryEntry } from '../types';
 import { formatKorean, todayISO } from '../utils/date';
 import { blobToObjectURL } from '../utils/image';
@@ -12,6 +13,7 @@ export function BookExportPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
   const printAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,6 +43,7 @@ export function BookExportPage() {
     const container = printAreaRef.current;
     if (!container || selectedEntries.length === 0) return;
     setError(null);
+    setStatus(null);
     setGenerating(true);
     try {
       const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
@@ -59,7 +62,12 @@ export function BookExportPage() {
         }
         doc.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
       }
-      doc?.save(`세줄일기-책-${todayISO()}.pdf`);
+      if (!doc) return;
+      // jsPDF의 save()는 내부적으로 만든 blob URL을 곧바로 해제해서, 느린 모바일
+      // 환경에서는 "내려받는 중" 표시만 뜨고 실제 파일은 저장되지 않는 경우가 있다.
+      // blob을 직접 꺼내 지연 해제되는 downloadBlob으로 내려받는다.
+      downloadBlob(doc.output('blob'), `세줄일기-책-${todayISO()}.pdf`);
+      setStatus(`PDF ${pages.length}페이지를 저장했어요.`);
     } catch (err) {
       setError((err as Error).message || 'PDF를 만들지 못했습니다.');
     } finally {
@@ -105,6 +113,7 @@ export function BookExportPage() {
               ? 'PDF 만드는 중...'
               : `선택한 ${selectedEntries.length}개 페이지 PDF로 저장`}
           </button>
+          {status && <p className="backup-status">{status}</p>}
           {error && <p className="backup-status backup-status-error">{error}</p>}
 
           <p className="book-preview-label">미리보기</p>

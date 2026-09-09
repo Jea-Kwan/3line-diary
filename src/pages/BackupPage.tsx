@@ -8,6 +8,7 @@ import {
   dataURLToBlob,
   parseBackup,
 } from '../utils/backup';
+import { downloadBlob } from '../utils/download';
 
 type Status = { kind: 'ok' | 'error'; message: string } | null;
 type PendingImport = { backup: BackupFile; overwrites: number };
@@ -37,16 +38,7 @@ export function BackupPage() {
     try {
       const backup = await buildBackup(entries);
       const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = backupFileName();
-      // iOS 사파리는 링크가 문서에 붙어 있어야 내려받는다.
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      // 곧바로 해제하면 내려받기가 시작되기 전에 끊길 수 있다.
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      downloadBlob(blob, backupFileName());
       setStatus({ kind: 'ok', message: `${backup.entries.length}개의 일기를 내보냈어요.` });
     } catch (err) {
       setStatus({ kind: 'error', message: (err as Error).message });
