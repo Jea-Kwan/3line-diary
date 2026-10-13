@@ -288,6 +288,10 @@ body {
   font-size: 22px;
 }
 
+.entry-summary {
+  min-width: 0;
+}
+
 .entry-date {
   font-size: 13px;
   color: var(--muted);
@@ -296,6 +300,7 @@ body {
 .entry-first-line {
   font-size: 15px;
   margin-top: 2px;
+  overflow-wrap: anywhere;
 }
 
 /* Book export select list */
@@ -380,6 +385,8 @@ body {
   line-height: 1.7;
   color: var(--ink);
   white-space: pre-line;
+  /* 띄어쓰기 없는 긴 영문·숫자도 카드 안에서 줄바꿈되게 한다 */
+  overflow-wrap: anywhere;
 }
 
 /* Calendar page */
