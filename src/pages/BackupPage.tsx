@@ -8,7 +8,9 @@ import {
   dataURLToBlob,
   parseBackup,
 } from '../utils/backup';
+import { InAppBrowserNotice } from '../components/InAppBrowserNotice';
 import { downloadBlob } from '../utils/download';
+import { isInAppBrowser } from '../utils/inAppBrowser';
 
 type Status = { kind: 'ok' | 'error'; message: string } | null;
 type PendingImport = { backup: BackupFile; overwrites: number };
@@ -105,10 +107,11 @@ export function BackupPage() {
           사진까지 포함해 JSON 파일 하나로 저장합니다. 기기를 바꾸거나 앱 데이터를 지우기 전에
           받아두세요.
         </p>
+        <InAppBrowserNotice />
         <button
           className="save-button"
           onClick={handleExport}
-          disabled={busy || entries.length === 0}
+          disabled={busy || entries.length === 0 || isInAppBrowser()}
         >
           백업 파일 내려받기
         </button>

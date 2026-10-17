@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { jsPDF as JsPDF } from 'jspdf';
 import { listEntries } from '../db/db';
+import { InAppBrowserNotice } from '../components/InAppBrowserNotice';
 import { downloadBlob } from '../utils/download';
+import { isInAppBrowser } from '../utils/inAppBrowser';
 import { DiaryEntry } from '../types';
 import { formatKorean, todayISO } from '../utils/date';
 import { blobToObjectURL } from '../utils/image';
@@ -35,6 +37,7 @@ export function BookExportPage() {
   }
 
   const selectedEntries = entries.filter((e) => selected.has(e.date));
+  const inApp = isInAppBrowser();
 
   // 브라우저 인쇄(window.print())는 홈 화면에 설치된 PWA(standalone 모드)에서
   // 인쇄창 자체를 띄우지 못해 눌러도 반응이 없다. 그래서 화면에 보이는 미리보기를
@@ -104,10 +107,11 @@ export function BookExportPage() {
             ))}
           </ul>
 
+          <InAppBrowserNotice />
           <button
             className="save-button"
             onClick={handleGeneratePdf}
-            disabled={selectedEntries.length === 0 || generating}
+            disabled={selectedEntries.length === 0 || generating || inApp}
           >
             {generating
               ? 'PDF 만드는 중...'
