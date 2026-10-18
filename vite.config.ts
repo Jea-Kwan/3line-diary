@@ -33,6 +33,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        // 개인정보처리방침은 앱 화면(index.html)으로 대체되지 않고 그대로 열려야 한다.
+        navigateFallbackDenylist: [/privacy\.html$/],
       },
     }),
   ],
