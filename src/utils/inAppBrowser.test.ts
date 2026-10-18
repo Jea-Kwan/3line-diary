@@ -5,7 +5,7 @@ const KAKAO_UA =
   'Mozilla/5.0 (Linux; Android 14; SM-S921N) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/124.0 Mobile Safari/537.36 KAKAOTALK/10.4.0';
 const CHROME_UA =
   'Mozilla/5.0 (Linux; Android 14; SM-S921N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36';
-const URL_ = 'https://jea-kwan.github.io/3line-diary/#/book';
+const URL_ = 'https://example.com/diary/#/book';
 
 describe('isInAppBrowser', () => {
   it('카카오톡 인앱 브라우저를 알아본다', () => {
@@ -31,7 +31,7 @@ describe('externalBrowserUrl', () => {
 
   it('다른 안드로이드 인앱에서는 크롬 intent 주소를 만든다', () => {
     expect(externalBrowserUrl(URL_, 'Mozilla/5.0 (Linux; Android 14) Instagram 300.0')).toBe(
-      'intent://jea-kwan.github.io/3line-diary/#Intent;scheme=https;package=com.android.chrome;end'
+      'intent://example.com/diary/#Intent;scheme=https;package=com.android.chrome;end'
     );
   });
 
