@@ -11,17 +11,24 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icons/icon-192.png', 'icons/icon-512.png'],
       manifest: {
+        // 앱 고유 식별자. 안드로이드 앱(TWA)으로 만들 때 같은 앱임을 구분하는 기준이라 바꾸지 않는다.
+        id: '/3line-diary/',
         name: '세줄일기',
         short_name: '세줄일기',
         description: '사진 한 장과 세 줄로 남기는 하루',
+        lang: 'ko',
         start_url: './',
         scope: './',
         display: 'standalone',
+        orientation: 'portrait',
+        categories: ['lifestyle', 'productivity'],
         background_color: '#faf7f2',
         theme_color: '#faf7f2',
         icons: [
-          { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+          { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
