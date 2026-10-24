@@ -116,11 +116,18 @@ body {
 }
 
 /* Diary text area */
-.diary-counter {
+.diary-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
   margin: 6px 4px 24px;
-  text-align: right;
   font-size: 12px;
   color: var(--muted);
+}
+
+.diary-meta span:last-child {
+  flex: none;
+  white-space: nowrap;
 }
 
 .diary-counter-full {
@@ -305,18 +312,123 @@ body {
 }
 
 .entry-summary {
+  flex: 1;
   min-width: 0;
 }
 
 .entry-date {
   font-size: 13px;
   color: var(--muted);
+  white-space: nowrap;
 }
 
 .entry-first-line {
   font-size: 15px;
   margin-top: 2px;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+mark {
+  background: #fbe7a1;
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* List page: search, select mode */
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.list-text-button {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.list-text-button:disabled {
+  opacity: 0.4;
+}
+
+.list-search {
+  margin-bottom: 14px;
+}
+
+.list-search input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 16px;
+  font-family: inherit;
+}
+
+.list-search input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.list-select-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.list-page-selecting {
+  padding-bottom: 100px;
+}
+
+.entry-check {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  accent-color: var(--accent);
+}
+
+.entry-list-item-selected {
+  border-color: var(--accent);
+  background: #fdf1ec;
+}
+
+.list-action-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(64px + env(safe-area-inset-bottom));
+  width: 100%;
+  max-width: 480px;
+  padding: 10px 16px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+
+.list-delete-button {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  background: #c0392b;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.list-delete-button:disabled {
+  opacity: 0.4;
 }
 
 /* Book export select list */
@@ -340,7 +452,14 @@ body {
   font-size: 14px;
 }
 
+.book-select-date {
+  flex: none;
+  white-space: nowrap;
+}
+
 .book-select-preview {
+  flex: 1;
+  min-width: 0;
   color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;

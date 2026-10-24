@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { MAX_CHARS, MAX_LINES, countLines, limitLines } from '../utils/text';
+import { MAX_CHARS, MAX_LINES, fitText } from '../utils/text';
+import { countVisualLines } from '../utils/visualLines';
 
 interface Props {
   text: string;
@@ -16,7 +17,7 @@ export function DiaryTextArea({ text, onChange }: Props) {
     el.style.height = `${el.scrollHeight}px`;
   }, [text]);
 
-  const lines = countLines(text);
+  const lines = countVisualLines(text);
   const full = text.length >= MAX_CHARS || lines >= MAX_LINES;
   const over = text.length > MAX_CHARS || lines > MAX_LINES;
 
@@ -29,16 +30,18 @@ export function DiaryTextArea({ text, onChange }: Props) {
         placeholder="오늘 있었던 일, 느낀 점, 다짐을 자유롭게 적어보세요"
         rows={4}
         maxLength={MAX_CHARS}
-        onChange={(e) => onChange(limitLines(e.target.value))}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.nativeEvent.isComposing && lines >= MAX_LINES) {
-            e.preventDefault();
-          }
+        onChange={(e) => {
+          // 값이 그대로면 React가 입력창을 이전 글로 되돌린다.
+          const fitted = fitText(e.target.value, text);
+          if (fitted !== text) onChange(fitted);
         }}
       />
-      <p className={'diary-counter' + (over ? ' diary-counter-over' : full ? ' diary-counter-full' : '')}>
-        {text.length} / {MAX_CHARS}자 · {lines} / {MAX_LINES}줄
-      </p>
+      <div className="diary-meta">
+        <span>줄 수는 책(A5 페이지) 기준이에요</span>
+        <span className={over ? 'diary-counter-over' : full ? 'diary-counter-full' : ''}>
+          {text.length} / {MAX_CHARS}자 · {lines} / {MAX_LINES}줄
+        </span>
+      </div>
     </div>
   );
 }

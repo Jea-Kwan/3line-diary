@@ -1,6 +1,7 @@
 import { openDB } from 'idb';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  deleteEntries,
   deleteEntry,
   getEntryByDate,
   importEntries,
@@ -98,6 +99,23 @@ describe('deleteEntry', () => {
 
   it('없는 날짜를 지워도 오류가 나지 않는다', async () => {
     await expect(deleteEntry('1999-01-01')).resolves.toBeUndefined();
+  });
+});
+
+describe('deleteEntries', () => {
+  it('고른 날짜들만 한꺼번에 지운다', async () => {
+    await saveEntry('2026-08-27', TEXT, null);
+    await saveEntry('2026-08-28', TEXT, null);
+    await saveEntry('2026-08-29', TEXT, null);
+    await deleteEntries(['2026-08-27', '2026-08-29']);
+    expect((await listEntries()).map((e) => e.date)).toEqual(['2026-08-28']);
+  });
+
+  it('빈 목록이나 없는 날짜를 넘겨도 오류가 나지 않는다', async () => {
+    await saveEntry('2026-08-28', TEXT, null);
+    await expect(deleteEntries([])).resolves.toBeUndefined();
+    await expect(deleteEntries(['1999-01-01'])).resolves.toBeUndefined();
+    expect(await listEntries()).toHaveLength(1);
   });
 });
 

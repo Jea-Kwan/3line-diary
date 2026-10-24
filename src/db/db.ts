@@ -72,6 +72,13 @@ export async function deleteEntry(date: string): Promise<void> {
   await db.delete(STORE_NAME, date);
 }
 
+export async function deleteEntries(dates: string[]): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction(STORE_NAME, 'readwrite');
+  for (const date of dates) tx.store.delete(date);
+  await tx.done;
+}
+
 export interface ImportItem {
   date: string;
   text: string;

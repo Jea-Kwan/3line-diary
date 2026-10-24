@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { jsPDF as JsPDF } from 'jspdf';
-import { BookPage, PAGE_H, PAGE_W } from '../components/BookPage';
+import { BookPage } from '../components/BookPage';
 import { InAppBrowserNotice } from '../components/InAppBrowserNotice';
 import { listEntries } from '../db/db';
 import { DiaryEntry } from '../types';
+import { PAGE_H, PAGE_W } from '../utils/bookLayout';
 import { formatKorean, todayISO } from '../utils/date';
 import { downloadBlob } from '../utils/download';
 import { isInAppBrowser } from '../utils/inAppBrowser';
@@ -140,7 +141,7 @@ export function BookExportPage() {
                     checked={selected.has(entry.date)}
                     onChange={() => toggle(entry.date)}
                   />
-                  <span>{formatKorean(entry.date)}</span>
+                  <span className="book-select-date">{formatKorean(entry.date)}</span>
                   <span className="book-select-preview">{firstLine(entry.text)}</span>
                 </label>
               </li>

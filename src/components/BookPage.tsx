@@ -1,11 +1,8 @@
 import { useLayoutEffect, useRef } from 'react';
 import { DiaryEntry } from '../types';
+import { BASE_FONT, PAGE_H, PAGE_W } from '../utils/bookLayout';
 import { formatKorean } from '../utils/date';
 
-// A5(148×210mm)를 96dpi로 환산한 크기. PDF로 만들 때도 이 크기 그대로 캡처한다.
-export const PAGE_W = 559;
-export const PAGE_H = 794;
-const BASE_FONT = 14.67; // 11pt
 const MIN_FONT = 8;
 
 interface Props {
