@@ -8,9 +8,10 @@ const MIN_FONT = 8;
 interface Props {
   entry: DiaryEntry;
   photoURL: string | null;
+  topicLabel?: string; // 여러 주제를 한 권으로 묶을 때 페이지에 주제 이름을 같이 적는다
 }
 
-export function BookPage({ entry, photoURL }: Props) {
+export function BookPage({ entry, photoURL, topicLabel }: Props) {
   const boxRef = useRef<HTMLDivElement>(null);
 
   // 180자를 넘겨 쓴 옛 일기처럼 글이 한 페이지에 안 들어가면 글자 크기를 줄여 맞춘다.
@@ -30,7 +31,10 @@ export function BookPage({ entry, photoURL }: Props) {
       <div className="book-sheet-photo">
         {photoURL ? <img src={photoURL} alt="" /> : <div className="book-sheet-photo-empty" />}
       </div>
-      <div className="book-sheet-date">{formatKorean(entry.date)}</div>
+      <div className="book-sheet-date">
+        {formatKorean(entry.date)}
+        {topicLabel ? ` · ${topicLabel}` : ''}
+      </div>
       <div className="book-sheet-textbox" ref={boxRef}>
         <p className="book-sheet-text">{entry.text}</p>
       </div>

@@ -5,15 +5,17 @@ import {
   backupFileName,
   blobToDataURL,
   buildBackup,
+  countOverwrites,
   dataURLToBlob,
   parseBackup,
 } from './backup';
-import { DiaryEntry } from '../types';
+import { DiaryEntry, Topic } from '../types';
 
 function entry(overrides: Partial<DiaryEntry> = {}): DiaryEntry {
   return {
     id: 'id-1',
     date: '2026-08-29',
+    topicId: null,
     photo: null,
     text: '첫 줄\n둘째 줄\n셋째 줄',
     createdAt: 1000,
@@ -22,6 +24,7 @@ function entry(overrides: Partial<DiaryEntry> = {}): DiaryEntry {
   };
 }
 
+const TOPIC: Topic = { id: 't-1', name: '가족', color: '#d97757', createdAt: 500 };
 const PHOTO_BYTES = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 
 describe('blobToDataURL / dataURLToBlob', () => {
@@ -38,44 +41,59 @@ describe('blobToDataURL / dataURLToBlob', () => {
 });
 
 describe('buildBackup', () => {
-  it('날짜 오름차순으로 정렬한다', async () => {
-    const backup = await buildBackup([
-      entry({ date: '2026-08-29' }),
-      entry({ date: '2026-01-02' }),
-      entry({ date: '2026-05-10' }),
-    ]);
-    expect(backup.entries.map((e) => e.date)).toEqual(['2026-01-02', '2026-05-10', '2026-08-29']);
+  it('날짜 오름차순, 같은 날은 먼저 쓴 순서로 정렬한다', async () => {
+    const backup = await buildBackup(
+      [
+        entry({ id: 'c', date: '2026-08-29', createdAt: 30 }),
+        entry({ id: 'a', date: '2026-01-02' }),
+        entry({ id: 'd', date: '2026-08-29', createdAt: 10 }),
+        entry({ id: 'b', date: '2026-05-10' }),
+      ],
+      []
+    );
+    expect(backup.entries.map((e) => e.id)).toEqual(['a', 'b', 'd', 'c']);
   });
 
   it('앱 이름과 버전, 내보낸 시각을 기록한다', async () => {
-    const backup = await buildBackup([entry()], new Date('2026-08-29T12:00:00Z'));
+    const backup = await buildBackup([entry()], [], new Date('2026-08-29T12:00:00Z'));
     expect(backup.app).toBe(BACKUP_APP_ID);
     expect(backup.version).toBe(BACKUP_VERSION);
     expect(backup.exportedAt).toBe('2026-08-29T12:00:00.000Z');
   });
 
+  it('주제와 일기의 주제 연결을 함께 담는다', async () => {
+    const backup = await buildBackup([entry({ topicId: TOPIC.id })], [TOPIC]);
+    expect(backup.topics).toEqual([TOPIC]);
+    expect(backup.entries[0].topicId).toBe('t-1');
+  });
+
   it('사진이 없으면 null로 남긴다', async () => {
-    const backup = await buildBackup([entry({ photo: null })]);
-    expect(backup.entries[0].photo).toBeNull();
+    expect((await buildBackup([entry({ photo: null })], [])).entries[0].photo).toBeNull();
   });
 
   it('일기가 없으면 빈 목록을 만든다', async () => {
-    expect((await buildBackup([])).entries).toEqual([]);
+    const backup = await buildBackup([], []);
+    expect(backup.entries).toEqual([]);
+    expect(backup.topics).toEqual([]);
   });
 });
 
 describe('내보내기 → 가져오기 왕복', () => {
-  it('사진을 포함해 내용이 그대로 보존된다', async () => {
+  it('사진·주제를 포함해 내용이 그대로 보존된다', async () => {
     const original = entry({
       photo: new Blob([PHOTO_BYTES], { type: 'image/jpeg' }),
       text: '비 오는 날\n우산을 잃어버렸다\n내일은 챙기자',
+      topicId: TOPIC.id,
     });
 
-    const parsed = parseBackup(JSON.stringify(await buildBackup([original])));
+    const parsed = parseBackup(JSON.stringify(await buildBackup([original], [TOPIC])));
     expect(parsed.entries).toHaveLength(1);
+    expect(parsed.topics).toEqual([TOPIC]);
 
     const restored = parsed.entries[0];
+    expect(restored.id).toBe(original.id);
     expect(restored.date).toBe(original.date);
+    expect(restored.topicId).toBe(TOPIC.id);
     expect(restored.text).toBe(original.text);
     expect(restored.createdAt).toBe(original.createdAt);
     expect(restored.updatedAt).toBe(original.updatedAt);
@@ -91,7 +109,8 @@ describe('parseBackup 검증', () => {
       app: BACKUP_APP_ID,
       version: BACKUP_VERSION,
       exportedAt: '2026-08-29T00:00:00.000Z',
-      entries: [{ date: '2026-08-29', text: '자유롭게 적은 하루', photo: null }],
+      topics: [],
+      entries: [{ id: 'e1', date: '2026-08-29', topicId: null, text: '자유롭게 적은 하루', photo: null }],
       ...overrides,
     });
   }
@@ -110,6 +129,16 @@ describe('parseBackup 검증', () => {
 
   it('entries가 배열이 아니면 거부한다', () => {
     expect(() => parseBackup(file({ entries: null }))).toThrow('일기 목록이 없습니다.');
+  });
+
+  it('topics가 배열이 아니면 거부한다', () => {
+    expect(() => parseBackup(file({ topics: 'x' }))).toThrow('주제 목록이 올바르지 않습니다.');
+  });
+
+  it('이름이 없는 주제는 몇 번째인지 알려준다', () => {
+    expect(() => parseBackup(file({ topics: [{ id: 't', name: '  ' }] }))).toThrow(
+      '1번째 주제 정보가 올바르지 않습니다.'
+    );
   });
 
   it('날짜 형식이 틀리면 몇 번째인지 알려준다', () => {
@@ -134,12 +163,41 @@ describe('parseBackup 검증', () => {
     expect(typeof parsed.entries[0].updatedAt).toBe('number');
   });
 
-  it('예전 버전(1, 세 줄 배열)도 하나의 텍스트로 합쳐서 받아들인다', () => {
+  it('버전 2(자유 서술, id·주제 없음)도 받아들인다', () => {
     const parsed = parseBackup(
-      file({ version: 1, entries: [{ date: '2026-08-29', lines: ['하나', '둘', '셋'] }] })
+      JSON.stringify({
+        app: BACKUP_APP_ID,
+        version: 2,
+        entries: [{ date: '2026-08-29', text: '버전 2 일기', photo: null }],
+      })
+    );
+    expect(parsed.topics).toEqual([]);
+    expect(parsed.entries[0]).toMatchObject({ id: undefined, topicId: null, text: '버전 2 일기' });
+  });
+
+  it('버전 1(세 줄 배열)도 하나의 텍스트로 합쳐서 받아들인다', () => {
+    const parsed = parseBackup(
+      JSON.stringify({
+        app: BACKUP_APP_ID,
+        version: 1,
+        entries: [{ date: '2026-08-29', lines: ['하나', '둘', '셋'] }],
+      })
     );
     expect(parsed.entries).toHaveLength(1);
     expect(parsed.entries[0].text).toBe('하나\n둘\n셋');
+  });
+});
+
+describe('countOverwrites', () => {
+  const existing = [entry({ id: 'x', date: '2026-08-29', topicId: null }), entry({ id: 'y', date: '2026-08-30', topicId: 't-1' })];
+  const item = (over: object) => ({ date: '2026-08-29', topicId: null, text: 't', photo: null, createdAt: 1, updatedAt: 1, ...over });
+
+  it('id가 같으면 덮어쓰는 것으로 센다', () => {
+    expect(countOverwrites([item({ id: 'x' }), item({ id: 'new' })], existing)).toBe(1);
+  });
+
+  it('id가 없으면 같은 날짜의 주제 없는 일기가 있을 때만 센다', () => {
+    expect(countOverwrites([item({}), item({ date: '2026-08-30' })], existing)).toBe(1);
   });
 });
 

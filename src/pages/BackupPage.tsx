@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { importEntries, listEntries } from '../db/db';
-import { DiaryEntry } from '../types';
+import { importData, listEntries, listTopics } from '../db/db';
+import { InAppBrowserNotice } from '../components/InAppBrowserNotice';
+import { DiaryEntry, Topic } from '../types';
 import {
   BackupFile,
   backupFileName,
   buildBackup,
+  countOverwrites,
   dataURLToBlob,
   parseBackup,
 } from '../utils/backup';
-import { InAppBrowserNotice } from '../components/InAppBrowserNotice';
 import { downloadBlob } from '../utils/download';
 import { isInAppBrowser } from '../utils/inAppBrowser';
 
@@ -17,6 +18,7 @@ type PendingImport = { backup: BackupFile; overwrites: number };
 
 export function BackupPage() {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
+  const [topics, setTopics] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status>(null);
@@ -24,8 +26,9 @@ export function BackupPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   function reload() {
-    return listEntries().then((list) => {
-      setEntries(list);
+    return Promise.all([listEntries(), listTopics()]).then(([e, t]) => {
+      setEntries(e);
+      setTopics(t);
       setLoading(false);
     });
   }
@@ -38,10 +41,13 @@ export function BackupPage() {
     setBusy(true);
     setStatus(null);
     try {
-      const backup = await buildBackup(entries);
+      const backup = await buildBackup(entries, topics);
       const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
       downloadBlob(blob, backupFileName());
-      setStatus({ kind: 'ok', message: `${backup.entries.length}개의 일기를 내보냈어요.` });
+      setStatus({
+        kind: 'ok',
+        message: `일기 ${backup.entries.length}개와 주제 ${backup.topics.length}개를 내보냈어요.`,
+      });
     } catch (err) {
       setStatus({ kind: 'error', message: (err as Error).message });
     } finally {
@@ -57,9 +63,7 @@ export function BackupPage() {
     setStatus(null);
     try {
       const backup = parseBackup(await file.text());
-      const existing = new Set(entries.map((entry) => entry.date));
-      const overwrites = backup.entries.filter((entry) => existing.has(entry.date)).length;
-      setPendingImport({ backup, overwrites });
+      setPendingImport({ backup, overwrites: countOverwrites(backup.entries, entries) });
     } catch (err) {
       setStatus({ kind: 'error', message: (err as Error).message });
     }
@@ -70,19 +74,22 @@ export function BackupPage() {
     const { backup } = pendingImport;
     setBusy(true);
     try {
-      const result = await importEntries(
-        backup.entries.map((entry) => ({
+      const result = await importData({
+        topics: backup.topics,
+        entries: backup.entries.map((entry) => ({
+          id: entry.id,
           date: entry.date,
+          topicId: entry.topicId,
           text: entry.text,
           photo: entry.photo ? dataURLToBlob(entry.photo) : null,
           createdAt: entry.createdAt,
           updatedAt: entry.updatedAt,
-        }))
-      );
+        })),
+      });
       await reload();
       setStatus({
         kind: 'ok',
-        message: `새 일기 ${result.added}개, 덮어쓴 일기 ${result.updated}개를 가져왔어요.`,
+        message: `새 일기 ${result.added}개, 덮어쓴 일기 ${result.updated}개, 새 주제 ${result.topicsAdded}개를 가져왔어요.`,
       });
     } catch (err) {
       setStatus({ kind: 'error', message: (err as Error).message });
@@ -98,14 +105,16 @@ export function BackupPage() {
     <div className="page backup-page">
       <header className="page-header">
         <h1>백업</h1>
-        <p className="page-subtitle">일기 {entries.length}개가 이 기기에 저장되어 있어요</p>
+        <p className="page-subtitle">
+          일기 {entries.length}개, 주제 {topics.length}개가 이 기기에 저장되어 있어요
+        </p>
       </header>
 
       <section className="backup-section">
         <h2>내보내기</h2>
         <p className="backup-desc">
-          사진까지 포함해 JSON 파일 하나로 저장합니다. 기기를 바꾸거나 앱 데이터를 지우기 전에
-          받아두세요.
+          사진과 주제까지 포함해 JSON 파일 하나로 저장합니다. 기기를 바꾸거나 앱 데이터를 지우기
+          전에 받아두세요.
         </p>
         <InAppBrowserNotice />
         <button
@@ -120,7 +129,8 @@ export function BackupPage() {
       <section className="backup-section">
         <h2>가져오기</h2>
         <p className="backup-desc">
-          백업 파일을 불러옵니다. 같은 날짜의 일기가 이미 있으면 파일 쪽 내용으로 덮어씁니다.
+          백업 파일을 불러옵니다. 같은 일기가 이미 있으면 파일 쪽 내용으로 덮어씁니다. 예전
+          버전에서 받은 백업 파일도 가져올 수 있어요.
         </p>
         <input
           ref={fileRef}
@@ -137,7 +147,7 @@ export function BackupPage() {
           <div className="delete-confirm">
             <p>
               {pendingImport.overwrites > 0
-                ? `일기 ${pendingImport.backup.entries.length}개를 가져옵니다. 그중 ${pendingImport.overwrites}개는 이미 있는 날짜라 덮어써집니다. 계속할까요?`
+                ? `일기 ${pendingImport.backup.entries.length}개를 가져옵니다. 그중 ${pendingImport.overwrites}개는 이미 있는 일기라 덮어써집니다. 계속할까요?`
                 : `일기 ${pendingImport.backup.entries.length}개를 가져올까요?`}
             </p>
             <div className="delete-confirm-actions">

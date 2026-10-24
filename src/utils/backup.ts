@@ -1,10 +1,20 @@
-import { DiaryEntry } from '../types';
+import { DiaryEntry, Topic } from '../types';
 
 export const BACKUP_APP_ID = 'three-line-diary';
-export const BACKUP_VERSION = 2;
+// 1: 세 칸(lines) / 2: 자유 서술(text) / 3: 하루 여러 개 + 주제(topics, id, topicId)
+export const BACKUP_VERSION = 3;
+
+export interface BackupTopic {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: number;
+}
 
 export interface BackupEntry {
+  id?: string; // 버전 2 이하 백업에는 없다
   date: string;
+  topicId: string | null;
   text: string;
   photo: string | null; // data URL
   createdAt: number;
@@ -15,6 +25,7 @@ export interface BackupFile {
   app: typeof BACKUP_APP_ID;
   version: number;
   exportedAt: string;
+  topics: BackupTopic[];
   entries: BackupEntry[];
 }
 
@@ -40,22 +51,29 @@ export function dataURLToBlob(dataURL: string): Blob {
   return new Blob([bytes], { type: mime || 'application/octet-stream' });
 }
 
-export async function buildBackup(entries: DiaryEntry[], now = new Date()): Promise<BackupFile> {
+export async function buildBackup(
+  entries: DiaryEntry[],
+  topics: Topic[],
+  now = new Date()
+): Promise<BackupFile> {
   const backupEntries: BackupEntry[] = [];
   for (const entry of entries) {
     backupEntries.push({
+      id: entry.id,
       date: entry.date,
+      topicId: entry.topicId,
       text: entry.text,
       photo: entry.photo ? await blobToDataURL(entry.photo) : null,
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
     });
   }
-  backupEntries.sort((a, b) => a.date.localeCompare(b.date));
+  backupEntries.sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
   return {
     app: BACKUP_APP_ID,
     version: BACKUP_VERSION,
     exportedAt: now.toISOString(),
+    topics: topics.map(({ id, name, color, createdAt }) => ({ id, name, color, createdAt })),
     entries: backupEntries,
   };
 }
@@ -84,21 +102,39 @@ export function parseBackup(text: string): BackupFile {
     throw new Error('백업 파일에 일기 목록이 없습니다.');
   }
 
+  // 버전 2 이하 백업에는 주제가 없다.
+  const rawTopics: unknown[] = file.topics === undefined ? [] : file.topics;
+  if (!Array.isArray(rawTopics)) {
+    throw new Error('백업 파일의 주제 목록이 올바르지 않습니다.');
+  }
+  const topics: BackupTopic[] = rawTopics.map((item, index) => {
+    const t = item as Partial<BackupTopic>;
+    if (typeof t.id !== 'string' || typeof t.name !== 'string' || t.name.trim() === '') {
+      throw new Error(`${index + 1}번째 주제 정보가 올바르지 않습니다.`);
+    }
+    return {
+      id: t.id,
+      name: t.name,
+      color: typeof t.color === 'string' ? t.color : '#8a8378',
+      createdAt: typeof t.createdAt === 'number' ? t.createdAt : Date.now(),
+    };
+  });
+
   const entries: BackupEntry[] = file.entries.map((item, index) => {
-    // 예전 백업 파일(버전 1)은 세 줄이 lines 배열로 나뉘어 있었다. 하나로 합쳐서 받아들인다.
+    // 버전 1 백업은 세 줄이 lines 배열로 나뉘어 있었다. 하나로 합쳐서 받아들인다.
     const e = item as Partial<BackupEntry> & { lines?: unknown };
     if (typeof e.date !== 'string' || !DATE_RE.test(e.date)) {
       throw new Error(`${index + 1}번째 일기의 날짜가 올바르지 않습니다.`);
     }
-    let text: string;
+    let entryText: string;
     if (typeof e.text === 'string') {
-      text = e.text;
+      entryText = e.text;
     } else if (
       Array.isArray(e.lines) &&
       e.lines.length === 3 &&
       e.lines.every((l) => typeof l === 'string')
     ) {
-      text = (e.lines as string[]).join('\n');
+      entryText = (e.lines as string[]).join('\n');
     } else {
       throw new Error(`${e.date} 일기의 내용이 올바르지 않습니다.`);
     }
@@ -106,8 +142,10 @@ export function parseBackup(text: string): BackupFile {
       throw new Error(`${e.date} 일기의 사진 데이터가 올바르지 않습니다.`);
     }
     return {
+      id: typeof e.id === 'string' ? e.id : undefined,
       date: e.date,
-      text,
+      topicId: typeof e.topicId === 'string' ? e.topicId : null,
+      text: entryText,
       photo: e.photo ?? null,
       createdAt: typeof e.createdAt === 'number' ? e.createdAt : Date.now(),
       updatedAt: typeof e.updatedAt === 'number' ? e.updatedAt : Date.now(),
@@ -118,8 +156,18 @@ export function parseBackup(text: string): BackupFile {
     app: BACKUP_APP_ID,
     version: file.version,
     exportedAt: typeof file.exportedAt === 'string' ? file.exportedAt : '',
+    topics,
     entries,
   };
+}
+
+/** 가져오면 기존 일기를 덮어쓰게 될 백업 일기의 수 (db.importData의 짝짓기 규칙과 같다). */
+export function countOverwrites(items: BackupEntry[], existing: DiaryEntry[]): number {
+  return items.filter((item) =>
+    item.id
+      ? existing.some((e) => e.id === item.id)
+      : existing.some((e) => e.date === item.date && e.topicId === null)
+  ).length;
 }
 
 export function backupFileName(now = new Date()): string {

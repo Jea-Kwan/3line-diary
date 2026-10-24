@@ -317,8 +317,16 @@ body {
 }
 
 .entry-date {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
   font-size: 13px;
   color: var(--muted);
+}
+
+.entry-date-text {
+  flex: none;
   white-space: nowrap;
 }
 
@@ -625,18 +633,243 @@ mark {
   opacity: 0.35;
 }
 
-.calendar-dot {
-  color: var(--accent);
-  font-size: 14px;
-  line-height: 6px;
+.calendar-cell-selected {
+  border-color: var(--ink);
+}
+
+.calendar-dots {
+  display: flex;
+  gap: 3px;
   height: 6px;
+}
+
+.calendar-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
 }
 
 .calendar-hint {
   color: var(--muted);
   font-size: 13px;
   text-align: center;
-  margin-top: 16px;
+  margin: 12px 0;
+}
+
+.day-panel {
+  margin-top: 20px;
+}
+
+.section-title {
+  font-size: 15px;
+  margin: 0 0 10px;
+}
+
+.day-full-notice {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.today-entries {
+  margin-top: 28px;
+}
+
+/* Topics */
+.topic-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.topic-dot-lg {
+  width: 14px;
+  height: 14px;
+}
+
+.topic-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.entry-topic {
+  margin-bottom: 2px;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.chip-active {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #fff;
+}
+
+.chip-count {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.topic-picker {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.topic-picker .chip-row {
+  flex: 1;
+  margin-bottom: 8px;
+}
+
+.topic-manage-link {
+  flex: none;
+  padding: 8px 0;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.topic-list {
+  list-style: none;
+  margin: 0 0 24px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.topic-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.topic-row > .delete-confirm,
+.topic-row > .topic-form {
+  flex: 1;
+}
+
+.topic-row-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.topic-row-name {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.topic-row-count {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.topic-delete {
+  color: #c0392b;
+}
+
+.topic-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.topic-form input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 16px;
+  font-family: inherit;
+}
+
+.topic-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.color-swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  padding: 0;
+}
+
+.color-swatch-active {
+  border-color: var(--card);
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+.topic-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.topic-submit {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.topic-submit:disabled {
+  opacity: 0.5;
+}
+
+.topic-form-actions .delete-confirm-cancel {
+  flex: 1;
 }
 
 /* Backup page */
@@ -718,6 +951,16 @@ mark {
   background: transparent;
   color: var(--ink);
   border: 1px solid var(--border);
+}
+
+.update-blocked-banner {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: #fdf1ec;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 /* 탭이 5개라 좁은 화면에서 글자를 줄인다 */

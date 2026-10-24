@@ -1,10 +1,16 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { deleteEntries, listEntries } from '../db/db';
-import { DiaryEntry } from '../types';
+import { ChipRow, ChipOption } from '../components/ChipRow';
+import { TopicChip } from '../components/TopicChip';
+import { useThumbURLs } from '../hooks/useThumbURLs';
+import { deleteEntries, listEntries, listTopics } from '../db/db';
+import { DiaryEntry, Topic } from '../types';
 import { formatKorean } from '../utils/date';
-import { blobToObjectURL } from '../utils/image';
 import { matchedLine, matchesQuery, splitByQuery } from '../utils/search';
+import { NO_TOPIC_COLOR, NO_TOPIC_LABEL, topicMap } from '../utils/topics';
+
+const ALL = 'all';
+const NONE = 'none';
 
 function Highlight({ text, query }: { text: string; query: string }) {
   return (
@@ -16,40 +22,52 @@ function Highlight({ text, query }: { text: string; query: string }) {
   );
 }
 
+function inTopic(entry: DiaryEntry, filter: string): boolean {
+  if (filter === ALL) return true;
+  if (filter === NONE) return entry.topicId === null;
+  return entry.topicId === filter;
+}
+
 export function ListPage() {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
-  const [thumbURLs, setThumbURLs] = useState<Record<string, string>>({});
+  const [topics, setTopics] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState(ALL);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
+  const thumbURLs = useThumbURLs(entries);
 
   useEffect(() => {
-    listEntries().then((list) => {
-      setEntries(list);
+    Promise.all([listEntries(), listTopics()]).then(([e, t]) => {
+      setEntries(e);
+      setTopics(t);
       setLoading(false);
     });
   }, []);
 
-  useEffect(() => {
-    const urls: Record<string, string> = {};
-    for (const entry of entries) {
-      if (entry.photo) urls[entry.date] = blobToObjectURL(entry.photo);
-    }
-    setThumbURLs(urls);
-    return () => Object.values(urls).forEach((url) => URL.revokeObjectURL(url));
-  }, [entries]);
-
+  const topicsById = useMemo(() => topicMap(topics), [topics]);
   const visible = useMemo(
-    () => entries.filter((entry) => matchesQuery(entry.text, query)),
-    [entries, query]
+    () => entries.filter((e) => inTopic(e, filter) && matchesQuery(e.text, query)),
+    [entries, filter, query]
   );
-  const selectedVisible = visible.filter((entry) => selected.has(entry.date));
+  const selectedVisible = visible.filter((e) => selected.has(e.id));
   const allSelected = visible.length > 0 && selectedVisible.length === visible.length;
-  const searching = query.trim() !== '';
+  const searching = query.trim() !== '' || filter !== ALL;
+
+  const filterOptions: ChipOption[] = useMemo(() => {
+    const counts = new Map<string | null, number>();
+    for (const e of entries) counts.set(e.topicId, (counts.get(e.topicId) ?? 0) + 1);
+    const options: ChipOption[] = [{ key: ALL, label: '전체', count: entries.length }];
+    for (const t of topics) options.push({ key: t.id, label: t.name, color: t.color, count: counts.get(t.id) ?? 0 });
+    if (counts.get(null)) {
+      options.push({ key: NONE, label: NO_TOPIC_LABEL, color: NO_TOPIC_COLOR, count: counts.get(null) });
+    }
+    return options;
+  }, [entries, topics]);
 
   function startSelecting() {
     setSelecting(true);
@@ -63,29 +81,29 @@ export function ListPage() {
     setConfirming(false);
   }
 
-  function toggle(date: string) {
+  function toggle(id: string) {
     setConfirming(false);
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(date)) next.delete(date);
-      else next.add(date);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
 
   function toggleAll() {
     setConfirming(false);
-    setSelected(allSelected ? new Set() : new Set(visible.map((entry) => entry.date)));
+    setSelected(allSelected ? new Set() : new Set(visible.map((e) => e.id)));
   }
 
   async function handleDelete() {
-    const dates = selectedVisible.map((entry) => entry.date);
-    if (dates.length === 0) return;
+    const ids = selectedVisible.map((e) => e.id);
+    if (ids.length === 0) return;
     setBusy(true);
     try {
-      await deleteEntries(dates);
-      const removed = new Set(dates);
-      setEntries((prev) => prev.filter((entry) => !removed.has(entry.date)));
+      await deleteEntries(ids);
+      const removed = new Set(ids);
+      setEntries((prev) => prev.filter((e) => !removed.has(e.id)));
       stopSelecting();
     } finally {
       setBusy(false);
@@ -101,7 +119,7 @@ export function ListPage() {
           <h1>내 일기 목록</h1>
           <p className="page-subtitle">
             {searching
-              ? `${visible.length}개 검색됨 (전체 ${entries.length}개)`
+              ? `${visible.length}개 찾음 (전체 ${entries.length}개)`
               : `${entries.length}개의 기록`}
           </p>
         </div>
@@ -118,15 +136,25 @@ export function ListPage() {
       </header>
 
       {entries.length > 0 && (
-        <div className="list-search">
-          <input
-            type="search"
-            value={query}
-            placeholder="일기 내용 검색"
-            aria-label="일기 내용 검색"
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
+        <>
+          <div className="list-search">
+            <input
+              type="search"
+              value={query}
+              placeholder="일기 내용 검색"
+              aria-label="일기 내용 검색"
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+          {filterOptions.length > 1 && (
+            <ChipRow
+              options={filterOptions}
+              value={filter}
+              onChange={setFilter}
+              ariaLabel="주제로 걸러 보기"
+            />
+          )}
+        </>
       )}
 
       {selecting && (
@@ -141,16 +169,17 @@ export function ListPage() {
       {entries.length === 0 ? (
         <p className="empty-message">아직 작성한 일기가 없어요. 오늘 첫 일기를 써보세요!</p>
       ) : visible.length === 0 ? (
-        <p className="empty-message">“{query.trim()}”이(가) 들어간 일기가 없어요.</p>
+        <p className="empty-message">조건에 맞는 일기가 없어요.</p>
       ) : (
         <ul className="entry-list">
           {visible.map((entry) => {
-            const isSelected = selected.has(entry.date);
+            const isSelected = selected.has(entry.id);
+            const topic = entry.topicId ? topicsById.get(entry.topicId) : undefined;
             return (
               <li
-                key={entry.date}
+                key={entry.id}
                 className={'entry-list-item' + (isSelected ? ' entry-list-item-selected' : '')}
-                onClick={() => (selecting ? toggle(entry.date) : navigate(`/entry/${entry.date}`))}
+                onClick={() => (selecting ? toggle(entry.id) : navigate(`/entry/${entry.id}`))}
               >
                 {selecting && (
                   <input
@@ -162,14 +191,17 @@ export function ListPage() {
                   />
                 )}
                 <div className="entry-thumb">
-                  {thumbURLs[entry.date] ? (
-                    <img src={thumbURLs[entry.date]} alt="" />
+                  {thumbURLs[entry.id] ? (
+                    <img src={thumbURLs[entry.id]} alt="" />
                   ) : (
                     <div className="entry-thumb-empty">📔</div>
                   )}
                 </div>
                 <div className="entry-summary">
-                  <div className="entry-date">{formatKorean(entry.date)}</div>
+                  <div className="entry-date">
+                    <span className="entry-date-text">{formatKorean(entry.date)}</span>
+                    {topic && <TopicChip topic={topic} />}
+                  </div>
                   <div className="entry-first-line">
                     <Highlight text={matchedLine(entry.text, query) || '(내용 없음)'} query={query} />
                   </div>

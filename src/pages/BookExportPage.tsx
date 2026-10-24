@@ -1,14 +1,31 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { jsPDF as JsPDF } from 'jspdf';
 import { BookPage } from '../components/BookPage';
+import { ChipOption, ChipRow } from '../components/ChipRow';
 import { InAppBrowserNotice } from '../components/InAppBrowserNotice';
-import { listEntries } from '../db/db';
-import { DiaryEntry } from '../types';
+import { TopicChip } from '../components/TopicChip';
+import { useThumbURLs } from '../hooks/useThumbURLs';
+import { listEntries, listTopics } from '../db/db';
+import { DiaryEntry, Topic } from '../types';
 import { PAGE_H, PAGE_W } from '../utils/bookLayout';
 import { formatKorean, todayISO } from '../utils/date';
 import { downloadBlob } from '../utils/download';
 import { isInAppBrowser } from '../utils/inAppBrowser';
 import { firstLine } from '../utils/text';
+import { NO_TOPIC_COLOR, NO_TOPIC_LABEL, topicMap } from '../utils/topics';
+
+const ALL = 'all';
+const NONE = 'none';
+
+function inBook(entry: DiaryEntry, book: string): boolean {
+  if (book === ALL) return true;
+  if (book === NONE) return entry.topicId === null;
+  return entry.topicId === book;
+}
+
+function safeFileName(name: string): string {
+  return name.replace(/[\\/:*?"<>|]/g, '_').trim() || '일기';
+}
 
 // 화면 폭에 맞춰 A5 페이지를 축소해서 보여주는 미리보기 틀
 function PagePreview({ children }: { children: React.ReactNode }) {
@@ -36,43 +53,70 @@ function PagePreview({ children }: { children: React.ReactNode }) {
 
 export function BookExportPage() {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [book, setBook] = useState(ALL);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [photoURLs, setPhotoURLs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const captureRef = useRef<HTMLDivElement>(null);
 
+  const chronological = (list: DiaryEntry[], key: string) =>
+    list
+      .filter((e) => inBook(e, key))
+      .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
+
   useEffect(() => {
-    let urls: Record<string, string> = {};
-    listEntries().then((list) => {
-      const chronological = [...list].sort((a, b) => a.date.localeCompare(b.date));
-      for (const entry of chronological) {
-        if (entry.photo) urls[entry.date] = URL.createObjectURL(entry.photo);
-      }
-      setPhotoURLs(urls);
-      setEntries(chronological);
-      setSelected(new Set(chronological.map((e) => e.date)));
+    Promise.all([listEntries(), listTopics()]).then(([list, t]) => {
+      // 책은 주제별 한 권이 기본: 가장 최근에 쓴 주제부터 보여준다.
+      const latestWithTopic = list.find((e) => e.topicId !== null)?.topicId ?? ALL;
+      setEntries(list);
+      setTopics(t);
+      setBook(latestWithTopic);
+      setSelected(new Set(chronological(list, latestWithTopic).map((e) => e.id)));
       setLoading(false);
     });
-    return () => {
-      Object.values(urls).forEach((url) => URL.revokeObjectURL(url));
-      urls = {};
-    };
   }, []);
 
-  function toggle(date: string) {
+  function changeBook(key: string) {
+    setBook(key);
+    setSelected(new Set(chronological(entries, key).map((e) => e.id)));
+    setStatus(null);
+    setError(null);
+  }
+
+  function toggle(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(date)) next.delete(date);
-      else next.add(date);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
 
-  const selectedEntries = entries.filter((e) => selected.has(e.date));
+  const topicsById = useMemo(() => topicMap(topics), [topics]);
+  const bookEntries = useMemo(() => chronological([...entries], book), [entries, book]);
+  const selectedEntries = bookEntries.filter((e) => selected.has(e.id));
+  const photoURLs = useThumbURLs(bookEntries);
   const inApp = isInAppBrowser();
+
+  const bookOptions: ChipOption[] = useMemo(() => {
+    const counts = new Map<string | null, number>();
+    for (const e of entries) counts.set(e.topicId, (counts.get(e.topicId) ?? 0) + 1);
+    const options: ChipOption[] = [];
+    for (const t of topics) {
+      if (counts.get(t.id)) options.push({ key: t.id, label: t.name, color: t.color, count: counts.get(t.id) });
+    }
+    if (counts.get(null)) {
+      options.push({ key: NONE, label: NO_TOPIC_LABEL, color: NO_TOPIC_COLOR, count: counts.get(null) });
+    }
+    options.push({ key: ALL, label: '전체', count: entries.length });
+    return options;
+  }, [entries, topics]);
+
+  const bookLabel =
+    book === ALL ? '전체' : book === NONE ? NO_TOPIC_LABEL : (topicsById.get(book)?.name ?? '일기');
 
   // 미리보기는 화면에 맞춰 축소되어 있으므로, 캡처는 축소되지 않은 A5 크기 페이지를
   // 화면 밖에 따로 그려서 한다. 브라우저 인쇄(window.print())는 설치형 앱에서
@@ -110,8 +154,8 @@ export function BookExportPage() {
       // jsPDF의 save()는 만든 blob URL을 곧바로 해제해서, 느린 모바일
       // 환경에서는 "내려받는 중" 표시만 뜨고 실제 파일은 저장되지 않는 경우가 있다.
       // blob을 직접 꺼내 지연 해제되는 downloadBlob으로 내려받는다.
-      downloadBlob(doc.output('blob'), `세줄일기-책-${todayISO()}.pdf`);
-      setStatus(`A5 PDF ${pages.length}페이지를 저장했어요.`);
+      downloadBlob(doc.output('blob'), `세줄일기-${safeFileName(bookLabel)}-${todayISO()}.pdf`);
+      setStatus(`“${bookLabel}” A5 PDF ${pages.length}페이지를 저장했어요.`);
     } catch (err) {
       setError((err as Error).message || 'PDF를 만들지 못했습니다.');
     } finally {
@@ -125,23 +169,28 @@ export function BookExportPage() {
     <div className="page book-export-page">
       <header className="page-header">
         <h1>책 만들기</h1>
-        <p className="page-subtitle">일기를 골라 A5 PDF로 저장하고 책으로 인쇄해보세요</p>
+        <p className="page-subtitle">주제를 고르면 그 주제의 일기를 한 권(A5 PDF)으로 만들어요</p>
       </header>
 
       {entries.length === 0 ? (
         <p className="empty-message">인쇄할 일기가 아직 없어요.</p>
       ) : (
         <>
+          <ChipRow options={bookOptions} value={book} onChange={changeBook} ariaLabel="책 주제" />
+
           <ul className="book-select-list">
-            {entries.map((entry) => (
-              <li key={entry.date} className="book-select-item">
+            {bookEntries.map((entry) => (
+              <li key={entry.id} className="book-select-item">
                 <label>
                   <input
                     type="checkbox"
-                    checked={selected.has(entry.date)}
-                    onChange={() => toggle(entry.date)}
+                    checked={selected.has(entry.id)}
+                    onChange={() => toggle(entry.id)}
                   />
                   <span className="book-select-date">{formatKorean(entry.date)}</span>
+                  {book === ALL && entry.topicId && topicsById.get(entry.topicId) && (
+                    <TopicChip topic={topicsById.get(entry.topicId)} />
+                  )}
                   <span className="book-select-preview">{firstLine(entry.text)}</span>
                 </label>
               </li>
@@ -156,7 +205,7 @@ export function BookExportPage() {
           >
             {generating
               ? 'PDF 만드는 중...'
-              : `선택한 ${selectedEntries.length}개 페이지 PDF로 저장`}
+              : `“${bookLabel}” ${selectedEntries.length}개 페이지 PDF로 저장`}
           </button>
           {status && <p className="backup-status">{status}</p>}
           {error && <p className="backup-status backup-status-error">{error}</p>}
@@ -164,8 +213,12 @@ export function BookExportPage() {
           <p className="book-preview-label">미리보기 (A5)</p>
           <div className="book-preview-list">
             {selectedEntries.map((entry) => (
-              <PagePreview key={entry.date}>
-                <BookPage entry={entry} photoURL={photoURLs[entry.date] ?? null} />
+              <PagePreview key={entry.id}>
+                <BookPage
+                  entry={entry}
+                  photoURL={photoURLs[entry.id] ?? null}
+                  topicLabel={book === ALL && entry.topicId ? topicsById.get(entry.topicId)?.name : undefined}
+                />
               </PagePreview>
             ))}
           </div>
@@ -173,7 +226,12 @@ export function BookExportPage() {
           {generating && (
             <div className="book-capture" ref={captureRef} aria-hidden="true">
               {selectedEntries.map((entry) => (
-                <BookPage key={entry.date} entry={entry} photoURL={photoURLs[entry.date] ?? null} />
+                <BookPage
+                  key={entry.id}
+                  entry={entry}
+                  photoURL={photoURLs[entry.id] ?? null}
+                  topicLabel={book === ALL && entry.topicId ? topicsById.get(entry.topicId)?.name : undefined}
+                />
               ))}
             </div>
           )}
